@@ -1,39 +1,55 @@
-require('dotenv').config(); // WAJIB PALING ATAS
+require('dotenv').config();
 
-const venom = require('venom-bot');
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason
+} = require('@whiskeysockets/baileys');
+
 const axios = require('axios');
+const Pino = require('pino');
 
-// validasi env saat start
 if (!process.env.DEEPSEEK_API_KEY) {
   console.error('ERROR: DEEPSEEK_API_KEY belum diset');
   process.exit(1);
 }
 
-// Buat bot
-venom
-  .create({
-    session: 'ai-bot',
-    multidevice: true,
-    disableSpins: true,
-    headless: true
-  })
-  .then(client => start(client))
-  .catch(err => console.error('Venom create error:', err));
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth');
 
-function start(client) {
-  console.log('Bot WA siap jalan');
+  const sock = makeWASocket({
+    auth: state,
+    logger: Pino({ level: 'silent' }),
+    printQRInTerminal: true
+  });
 
-  client.onStateChange(state => {
-    console.log('State changed:', state);
-    if (state === 'CONFLICT' || state === 'UNPAIRED') {
-      client.forceRefocus();
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
+    if (connection === 'close') {
+      const reason = lastDisconnect?.error?.output?.statusCode;
+      if (reason !== DisconnectReason.loggedOut) {
+        startBot();
+      }
+    }
+    if (connection === 'open') {
+      console.log('Bot WA siap (Baileys)');
     }
   });
 
-  client.onMessage(async message => {
-    if (!message.body || !message.body.startsWith('!ai ')) return;
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
 
-    const prompt = message.body.slice(4).trim();
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
+
+    const text =
+      msg.message.conversation ||
+      msg.message.extendedTextMessage?.text;
+
+    if (!text || !text.startsWith('!ai ')) return;
+
+    const prompt = text.slice(4).trim();
     if (!prompt) return;
 
     try {
@@ -48,15 +64,18 @@ function start(client) {
         }
       );
 
-      const answer = response.data?.answer || 'AI tidak bisa menjawab';
-      await client.sendText(message.from, answer);
+      const answer =
+        response.data?.answer || 'AI tidak bisa menjawab';
 
-    } catch (error) {
-      console.error('AI Error:', error.response?.data || error.message);
-      await client.sendText(
-        message.from,
-        'Terjadi error saat memanggil AI'
-      );
+      await sock.sendMessage(msg.key.remoteJid, { text: answer });
+
+    } catch (err) {
+      console.error('AI Error:', err.response?.data || err.message);
+      await sock.sendMessage(msg.key.remoteJid, {
+        text: 'Terjadi error saat memanggil AI'
+      });
     }
   });
 }
+
+startBot();
