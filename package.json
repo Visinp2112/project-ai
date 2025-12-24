@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npm install --production",
-    "start": "node index.js",
+    "start": "node index.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.19",
@@ -18,5 +18,6 @@
     "web-streams-polyfill": "^3.3.3"
   }
 }
+
 
 
