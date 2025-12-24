@@ -10,11 +10,11 @@ import OpenAI from 'openai';
 dotenv.config();
 
 // ======================
-// 1. SETUP OPENAI GPT-4
+// 1. SETUP OPENAI GPT-4o
 // ======================
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4';  // ⭐ GPT-4!
-const MAX_TOKENS = parseInt(process.env.MAX_TOKENS) || 300; // Batasi token
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';  // ⭐ GPT-4o! (Bukan gpt-4)
+const MAX_TOKENS = parseInt(process.env.MAX_TOKENS) || 300;
 
 if (!OPENAI_API_KEY) {
   console.error('❌ ERROR: OPENAI_API_KEY tidak ditemukan');
@@ -23,7 +23,7 @@ if (!OPENAI_API_KEY) {
 }
 
 console.log(`🚀 MODEL YANG DIGUNAKAN: ${OPENAI_MODEL}`);
-console.log(`💰 PERINGATAN: GPT-4 30× lebih mahal dari GPT-3.5!`);
+console.log(`💰 INFO: GPT-4o lebih murah dari GPT-4!`);
 console.log(`📊 Token limit: ${MAX_TOKENS} per response`);
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
@@ -36,7 +36,7 @@ let usageStats = {
   lastReset: Date.now()
 };
 
-async function callGPT4(prompt) {
+async function callGPT4o(prompt) {  // ⭐ Ganti nama fungsi
   const startTime = Date.now();
   
   try {
@@ -61,8 +61,10 @@ async function callGPT4(prompt) {
     const response = completion.choices[0].message.content;
     const tokensUsed = completion.usage?.total_tokens || 100;
     
-    // Hitung estimated cost
-    const costPerToken = OPENAI_MODEL.includes('gpt-4') ? 0.00006 : 0.000002;
+    // Hitung estimated cost (GPT-4o lebih murah)
+    const costPerToken = OPENAI_MODEL.includes('gpt-4o') ? 0.000015 :  // GPT-4o
+                         OPENAI_MODEL.includes('gpt-4') ? 0.00006 :   // GPT-4
+                         0.000002;                                    // GPT-3.5
     const requestCost = tokensUsed * costPerToken;
     
     usageStats.totalRequests++;
@@ -70,17 +72,17 @@ async function callGPT4(prompt) {
     
     const responseTime = Date.now() - startTime;
     
-    console.log(`✅ GPT-4 merespon (${responseTime}ms)`);
+    console.log(`✅ ${OPENAI_MODEL} merespon (${responseTime}ms)`);  // ⭐ Generic
     console.log(`💰 Token: ${tokensUsed} | Estimasi cost: $${requestCost.toFixed(6)}`);
     console.log(`📊 Total: ${usageStats.totalRequests} requests | $${usageStats.estimatedCost.toFixed(4)}`);
     
     return response;
     
   } catch (error) {
-    console.error('❌ Error dari GPT-4:', error.message);
+    console.error(`❌ Error dari ${OPENAI_MODEL}:`, error.message);
     
-    // Fallback ke GPT-3.5 jika GPT-4 error
-    if (error.status === 429 || error.code === 'insufficient_quota') {
+    // Fallback ke GPT-3.5 jika error
+    if (error.status === 404 || error.status === 429) {
       console.log('🔄 Coba fallback ke GPT-3.5-turbo...');
       try {
         const fallback = await openai.chat.completions.create({
@@ -102,8 +104,8 @@ async function callGPT4(prompt) {
 // 2. WHATSAPP BOT DENGAN MONITORING
 // ======================
 async function startBot() {
-  console.log('🚀 WhatsApp Bot dengan GPT-4 Active!');
-  console.log('⚠️  WARNING: GPT-4 = $0.06/1K tokens (MAHAL!)');
+  console.log('🚀 WhatsApp Bot dengan GPT-4o Active!');  // ⭐ UPDATE
+  console.log('💰 INFO: GPT-4o = $0.015/1K tokens (lebih murah!)');  // ⭐ UPDATE
   console.log('📌 Mode: Wajib tag/reply di grup');
   
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
@@ -113,7 +115,7 @@ async function startBot() {
     version,
     auth: state,
     printQRInTerminal: false,
-    browser: ['GPT-4 WhatsApp Bot', 'Chrome', '1.0.0']
+    browser: ['GPT-4o WhatsApp Bot', 'Chrome', '1.0.0']  // ⭐ UPDATE
   });
   
   // FUNGSI: Cek apakah perlu response
@@ -151,49 +153,31 @@ async function startBot() {
   
   // EVENT: Connection Update
   sock.ev.on('connection.update', (update) => {
-  const { connection, qr, lastDisconnect } = update;
-  
-  if (qr) {
-    console.log('\n' + '='.repeat(60));
-    console.log('📱 WHATSAPP BOT - SCAN QR CODE');
-    console.log('='.repeat(60));
+    const { connection, qr, lastDisconnect } = update;
     
-    // 1. Tampilkan QR di terminal
-    console.log('\n[OPTION 1 - Scan dari terminal]:');
-    qrcode.generate(qr, { small: true });
-    
-    // 2. Tampilkan link untuk online QR
-    console.log('\n[OPTION 2 - Buka link QR gambar]:');
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-    console.log(qrUrl);
-    
-    // 3. Alternatif link lainnya
-    console.log('\n[OPTION 3 - Alternatif link]:');
-    console.log(`https://quickchart.io/qr?text=${encodeURIComponent(qr)}&size=300`);
-    console.log(`https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(qr)}`);
-    
-    console.log('\n💡 CARA SCAN:');
-    console.log('• Screenshot QR di atas → zoom in → scan');
-    console.log('• ATAU buka link di browser → scan gambar');
-    console.log('• WhatsApp → Settings → Linked Devices');
-    console.log('='.repeat(60));
-  }
-  
-  if (connection === 'close') {
-    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-    
-    console.log(`⚠️ Koneksi terputus. Reconnect? ${shouldReconnect}`);
-    
-    if (shouldReconnect) {
-      console.log('🔄 Menghubungkan ulang dalam 3 detik...');
-      setTimeout(() => startBot(), 3000);
+    if (qr) {
+      console.log('📡 Scan QR Code:');
+      qrcode.generate(qr, { small: true });
+      
+      // ⭐ TAMBAHKAN LINK QR
+      console.log('\n🔗 ATAU BUKA LINK INI untuk QR Code gambar:');
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+      console.log(qrUrl);
     }
-  }
-  
-  if (connection === 'open') {
-    console.log('✅ WhatsApp terhubung! Bot siap menerima pesan.');
-  }
-});
+    
+    if (connection === 'close') {
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      if (shouldReconnect) {
+        console.log('🔄 Reconnecting...');
+        setTimeout(() => startBot(), 3000);
+      }
+    }
+    
+    if (connection === 'open') {
+      console.log('✅ WhatsApp Connected!');
+      showUsageStats();
+    }
+  });
   
   sock.ev.on('creds.update', saveCreds);
   
@@ -222,7 +206,7 @@ async function startBot() {
     await sock.sendPresenceUpdate('composing', sender);
     
     try {
-      const aiResponse = await callGPT4(cleanText);
+      const aiResponse = await callGPT4o(cleanText);  // ⭐ Ganti panggilan fungsi
       const finalResponse = isGroup ? `🤖 ${aiResponse}` : aiResponse;
       
       await sock.sendPresenceUpdate('paused', sender);
@@ -270,5 +254,4 @@ async function startBot() {
 // ======================
 // 3. START BOT
 // ======================
-
 startBot().catch(console.error);
