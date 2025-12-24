@@ -5,6 +5,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "build": "npm install --production",
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
@@ -18,3 +19,4 @@
     "web-streams-polyfill": "^3.3.3"
   }
 }
+
