@@ -5,95 +5,119 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
 import dotenv from 'dotenv';
-import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 
 dotenv.config();
 
 // ======================
-// 1. SETUP OPENAI GPT-3.5-TURBO
+// 1. SETUP GROQ AI (100% GRATIS)
 // ======================
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';  // ⭐ GPT-3.5-TURBO!
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama3-8b-8192';
 const MAX_TOKENS = parseInt(process.env.MAX_TOKENS) || 300;
 
-if (!OPENAI_API_KEY) {
-  console.error('❌ ERROR: OPENAI_API_KEY tidak ditemukan');
-  console.error('👉 Dapatkan di: https://platform.openai.com/api-keys');
+if (!GROQ_API_KEY) {
+  console.error('❌ ERROR: GROQ_API_KEY tidak ditemukan di file .env');
+  console.error('👉 Dapatkan API key GRATIS di: https://console.groq.com');
+  console.error('💡 No credit card required! Langsung dapat key');
   process.exit(1);
 }
 
-console.log(`🚀 MODEL YANG DIGUNAKAN: ${OPENAI_MODEL}`);
-console.log(`💰 INFO: GPT-3.5-turbo = $0.002/1K tokens (MURAH!)`);
-console.log(`📊 Token limit: ${MAX_TOKENS} per response`);
+console.log('🚀 WhatsApp Bot dengan Groq AI');
+console.log(`📌 Model: ${GROQ_MODEL}`);
+console.log('💰 STATUS: 100% GRATIS (no credit card needed)');
+console.log('📊 Rate limit: 30 requests/minute (cukup untuk bot)');
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+// Inisialisasi Groq client
+const groq = new Groq({
+  apiKey: GROQ_API_KEY,
+});
+
+// Simpan history pesan bot (untuk deteksi reply)
 const botMessageHistory = new Map();
 
-// Track usage untuk monitoring cost
-let usageStats = {
-  totalRequests: 0,
-  estimatedCost: 0,
-  lastReset: Date.now()
-};
+// Available Groq models (semua gratis)
+const GROQ_MODELS = [
+  'llama3-8b-8192',      // Cepat & efisien
+  'mixtral-8x7b-32768',  // Lebih pintar
+  'llama3-70b-8192',     // Sangat pintar
+  'gemma2-9b-it'         // Alternatif Google
+];
 
-async function callGPT(prompt) {  // ⭐ Nama fungsi lebih general
+async function callGroq(prompt) {
   const startTime = Date.now();
   
   try {
-    console.log(`🤖 [${OPENAI_MODEL}] Mengirim: "${prompt.substring(0, 40)}${prompt.length > 40 ? '...' : ''}"`);
+    console.log(`🤖 [${GROQ_MODEL}] Mengirim: "${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}"`);
     
-    const completion = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
+    const completion = await groq.chat.completions.create({
+      model: GROQ_MODEL,
       messages: [
         { 
           role: 'system', 
           content: `Kamu adalah asisten AI di WhatsApp. 
-          Gunakan Bahasa Indonesia yang natural dan ramah.
-          Jawab dengan singkat (maksimal ${MAX_TOKENS/5} kata).
-          Format: langsung ke inti, tanpa salam berlebihan.` 
+          • Gunakan Bahasa Indonesia yang natural
+          • Jawab dengan singkat dan ramah
+          • Format: langsung ke inti
+          • Jangan terlalu formal`
         },
-        { role: 'user', content: prompt }
+        { 
+          role: 'user', 
+          content: prompt 
+        }
       ],
       max_tokens: MAX_TOKENS,
       temperature: 0.7,
+      stream: false,
     });
     
     const response = completion.choices[0].message.content;
-    const tokensUsed = completion.usage?.total_tokens || 100;
-    
-    // Hitung estimated cost (GPT-3.5 lebih murah!)
-    const costPerToken = 0.000002;  // $0.002 per 1K tokens
-    const requestCost = tokensUsed * costPerToken;
-    
-    usageStats.totalRequests++;
-    usageStats.estimatedCost += requestCost;
-    
     const responseTime = Date.now() - startTime;
     
-    console.log(`✅ ${OPENAI_MODEL} merespon (${responseTime}ms)`);
-    console.log(`💰 Token: ${tokensUsed} | Estimasi cost: $${requestCost.toFixed(6)}`);
-    console.log(`📊 Total: ${usageStats.totalRequests} requests | $${usageStats.estimatedCost.toFixed(4)}`);
+    console.log(`✅ Groq merespon (${responseTime}ms)`);
+    console.log(`📏 Response length: ${response.length} karakter`);
     
     return response;
     
   } catch (error) {
-    console.error(`❌ Error dari ${OPENAI_MODEL}:`, error.message);
+    console.error('❌ Error dari Groq:', error.message);
     
-    if (error.status === 429) {
-      return 'Maaf, quota AI sedang habis. Coba lagi besok ya!';
+    // Auto fallback ke model lain jika error
+    if (error.status === 429 || error.type === 'rate_limit_exceeded') {
+      console.log('⏳ Rate limit exceeded, coba model lain...');
+      
+      for (const model of GROQ_MODELS) {
+        if (model !== GROQ_MODEL) {
+          console.log(`🔄 Coba fallback ke: ${model}`);
+          try {
+            const fallback = await groq.chat.completions.create({
+              model: model,
+              messages: [{ role: 'user', content: prompt }],
+              max_tokens: MAX_TOKENS,
+            });
+            return fallback.choices[0].message.content;
+          } catch (fallbackError) {
+            console.log(`❌ ${model} juga error, coba lagi...`);
+          }
+        }
+      }
     }
     
-    return 'Maaf, terjadi kesalahan. Silakan coba lagi!';
+    return 'Maaf, AI sedang sibuk. Coba lagi beberapa saat ya!';
   }
 }
 
 // ======================
-// 2. WHATSAPP BOT DENGAN MONITORING
+// 2. WHATSAPP BOT (WAJIB TAG/REPLY di GRUP)
 // ======================
 async function startBot() {
-  console.log('🚀 WhatsApp Bot dengan GPT-3.5-turbo Active!');  // ⭐ UPDATE
-  console.log('💰 INFO: GPT-3.5-turbo = $0.002/1K tokens (MURAH!)');  // ⭐ UPDATE
-  console.log('📌 Mode: Wajib tag/reply di grup');
+  console.log('='.repeat(60));
+  console.log('🤖 WHATSAPP BOT DENGAN GROQ AI');
+  console.log('='.repeat(60));
+  console.log(`📌 Model: ${GROQ_MODEL}`);
+  console.log('💰 GRATIS: No credit card, no billing');
+  console.log('📱 Mode: Private auto-response, Grup wajib tag/reply');
+  console.log('='.repeat(60));
   
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
   const { version } = await fetchLatestBaileysVersion();
@@ -102,162 +126,209 @@ async function startBot() {
     version,
     auth: state,
     printQRInTerminal: false,
-    browser: ['GPT-3.5 WhatsApp Bot', 'Chrome', '1.0.0']  // ⭐ UPDATE
+    browser: ['Groq WhatsApp Bot', 'Chrome', '1.0.0'],
+    emitOwnEvents: true,
+    connectTimeoutMs: 60000,
   });
   
-  // FUNGSI: Cek apakah perlu response
+  // ============================================
+  // A. FUNGSI UTAMA: CEK TAG & REPLY
+  // ============================================
   function shouldRespondToMessage(msg) {
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith('@g.us');
     const text = msg.message.conversation || 
-                 msg.message.extendedTextMessage?.text || '';
+                 msg.message.extendedTextMessage?.text ||
+                 msg.message.imageMessage?.caption || '';
     
+    // 1. GET BOT NUMBER
     const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+    
+    // 2. CEK MENTION (@TAG)
     const isMentioned = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botNumber);
     
+    // 3. CEK REPLY KE PESAN BOT
     let isReplyToBot = false;
     const quotedMsgId = msg.message.extendedTextMessage?.contextInfo?.stanzaId;
+    
     if (quotedMsgId && botMessageHistory.has(quotedMsgId)) {
       isReplyToBot = true;
     }
     
+    // 4. LOGIKA RESPON
     if (!isGroup) {
-      console.log('💬 Private chat: Auto-response');
+      // PRIVATE CHAT: Selalu response
       return { shouldRespond: true, cleanText: text, isGroup: false };
     }
     
+    // GRUP: Hanya response jika ditag ATAU reply ke bot
     if (isMentioned || isReplyToBot) {
       let cleanText = text;
+      
+      // Hapus tag dari teks jika ada
       if (isMentioned) {
         cleanText = text.replace(`@${botNumber.split('@')[0]}`, '').trim();
-        console.log('🏷️  Deteksi MENTION di grup');
       }
-      return { shouldRespond: true, cleanText: cleanText || text, isGroup: true };
+      
+      return { 
+        shouldRespond: true, 
+        cleanText: cleanText || text, 
+        isGroup: true
+      };
     }
     
+    // Abaikan pesan grup lain
     return { shouldRespond: false };
   }
   
-  // EVENT: Connection Update
+  // ============================================
+  // B. EVENT HANDLERS
+  // ============================================
+  
+  // Event: Connection Update
   sock.ev.on('connection.update', (update) => {
-  const { connection, qr, lastDisconnect } = update;
-  
-  if (qr) {
-    console.log('\n' + '='.repeat(60));
-    console.log('📱 WHATSAPP BOT - SCAN QR CODE');
-    console.log('='.repeat(60));
+    const { connection, qr, lastDisconnect } = update;
     
-    // 1. Tampilkan QR di terminal
-    console.log('\n[OPTION 1 - Scan dari terminal]:');
-    qrcode.generate(qr, { small: true });
-    
-    // 2. Tampilkan link untuk online QR
-    console.log('\n[OPTION 2 - Buka link QR gambar]:');
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-    console.log(qrUrl);
-    
-    // 3. Alternatif link lainnya
-    console.log('\n[OPTION 3 - Alternatif link]:');
-    console.log(`https://quickchart.io/qr?text=${encodeURIComponent(qr)}&size=300`);
-    console.log(`https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(qr)}`);
-    
-    console.log('\n💡 CARA SCAN:');
-    console.log('• Screenshot QR di atas → zoom in → scan');
-    console.log('• ATAU buka link di browser → scan gambar');
-    console.log('• WhatsApp → Settings → Linked Devices');
-    console.log('='.repeat(60));
-  }
-  
-  if (connection === 'close') {
-    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-    
-    console.log(`⚠️ Koneksi terputus. Reconnect? ${shouldReconnect}`);
-    
-    if (shouldReconnect) {
-      console.log('🔄 Menghubungkan ulang dalam 3 detik...');
-      setTimeout(() => startBot(), 3000);
+    if (qr) {
+      console.log('\n' + '='.repeat(60));
+      console.log('📱 SCAN QR CODE UNTUK WHATSAPP');
+      console.log('='.repeat(60));
+      
+      // Tampilkan QR di terminal
+      qrcode.generate(qr, { small: true });
+      
+      // Tampilkan link untuk scan via browser
+      console.log('\n🔗 ATAU BUKA LINK INI untuk QR Code gambar:');
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+      console.log(qrUrl);
+      
+      console.log('\n💡 CARA SCAN:');
+      console.log('1. Screenshot QR di atas → zoom in → scan');
+      console.log('2. ATAU buka link di browser → scan gambar');
+      console.log('3. WhatsApp → Settings → Linked Devices → Link a Device');
+      console.log('='.repeat(60));
     }
-  }
+    
+    if (connection === 'close') {
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      
+      console.log(`⚠️ Koneksi terputus. Reconnect? ${shouldReconnect}`);
+      
+      if (shouldReconnect) {
+        console.log('🔄 Menghubungkan ulang dalam 3 detik...');
+        setTimeout(() => startBot(), 3000);
+      } else {
+        console.log('❌ Sudah logout. Hapus folder auth_info lalu scan ulang.');
+      }
+    }
+    
+    if (connection === 'open') {
+      console.log('✅ WhatsApp Connected! Bot ready.');
+      console.log(`🤖 Model aktif: ${GROQ_MODEL}`);
+      console.log('📩 Kirim pesan untuk test...');
+    }
+  });
   
-  if (connection === 'open') {
-    console.log('✅ WhatsApp terhubung! Bot siap menerima pesan.');
-  }
-});
-  
+  // Event: Save Credentials
   sock.ev.on('creds.update', saveCreds);
   
-  // EVENT: Messages
+  // Event: New Messages
   sock.ev.on('messages.upsert', async ({ messages }) => {
     const msg = messages[0];
+    
+    // Skip jika bukan pesan teks atau dari kita sendiri
     if (!msg.message || msg.key.fromMe) return;
     
+    // Cek apakah pesan perlu direspon
     const responseCheck = shouldRespondToMessage(msg);
-    if (!responseCheck.shouldRespond) return;
+    
+    if (!responseCheck.shouldRespond) {
+      return; // Abaikan pesan (khusus grup yang bukan tag/reply)
+    }
     
     const { cleanText, isGroup } = responseCheck;
     const sender = msg.key.remoteJid;
     
-    console.log(`${isGroup ? '👥' : '💬'} User: "${cleanText.substring(0, 30)}..."`);
+    console.log(`\n${isGroup ? '👥 [GRUP]' : '💬 [PRIVATE]'} Pesan: "${cleanText.substring(0, 50)}${cleanText.length > 50 ? '...' : ''}"`);
     
-    // Cek credit sebelum kirim (jika < $0.01 left)
-    if (usageStats.estimatedCost > 4.90) {
-      console.log('⛔ CREDIT HAMPIR HABIS! ($5 limit)');
-      await sock.sendMessage(sender, { 
-        text: '⚠️ Maaf, credit AI hampir habis. Bot berhenti sementara.' 
-      });
-      return;
-    }
-    
+    // Kirim "typing" indicator
     await sock.sendPresenceUpdate('composing', sender);
     
     try {
-      const aiResponse = await callGPT(cleanText);  // ⭐ Ganti panggilan fungsi
+      // Dapatkan response dari Groq AI
+      const aiResponse = await callGroq(cleanText);
+      
+      // Format response untuk grup
       const finalResponse = isGroup ? `🤖 ${aiResponse}` : aiResponse;
       
+      // Hentikan "typing" dan kirim balasan
       await sock.sendPresenceUpdate('paused', sender);
       const sentMsg = await sock.sendMessage(sender, { text: finalResponse });
       
+      // SIMPAN ID pesan bot ke history (untuk deteksi reply)
       if (sentMsg.key?.id) {
         botMessageHistory.set(sentMsg.key.id, Date.now());
-        // Clean old entries
-        const oneHourAgo = Date.now() - 3600000;
+        
+        // Bersihkan history lama (lebih dari 2 jam)
+        const twoHoursAgo = Date.now() - 7200000;
         for (const [msgId, timestamp] of botMessageHistory.entries()) {
-          if (timestamp < oneHourAgo) botMessageHistory.delete(msgId);
+          if (timestamp < twoHoursAgo) {
+            botMessageHistory.delete(msgId);
+          }
         }
       }
       
-      console.log(`📤 Response sent!`);
+      console.log(`📤 Response terkirim (${finalResponse.length} chars)`);
       
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('❌ Error mengirim pesan:', error.message);
       await sock.sendMessage(sender, { 
-        text: 'Maaf, error. Coba lagi nanti!' 
+        text: 'Maaf, terjadi kesalahan. Coba lagi nanti ya!' 
       });
     }
   });
   
-  // FUNGSI: Tampilkan stats
-  function showUsageStats() {
-    const remaining = 5 - usageStats.estimatedCost;
-    console.log('📊 ========== USAGE STATS ==========');
-    console.log(`💰 Credit used: $${usageStats.estimatedCost.toFixed(4)} / $5.00`);
-    console.log(`💎 Remaining: $${remaining.toFixed(2)}`);
-    console.log(`📈 Requests: ${usageStats.totalRequests}`);
-    console.log(`📌 Model: ${OPENAI_MODEL}`);
-    console.log('====================================');
-    
-    // Warning jika credit < $1
-    if (remaining < 1.00) {
-      console.log('🚨 PERINGATAN: Credit kurang dari $1!');
+  // ============================================
+  // C. HELPER FUNCTIONS
+  // ============================================
+  
+  // Fungsi untuk ganti model runtime
+  function switchModel(newModel) {
+    if (GROQ_MODELS.includes(newModel)) {
+      console.log(`🔄 Switching model: ${GROQ_MODEL} → ${newModel}`);
+      GROQ_MODEL = newModel;
+      return true;
     }
+    return false;
   }
   
-  // Tampilkan stats setiap 10 pesan
-  setInterval(showUsageStats, 600000); // 10 menit
+  // Tampilkan bot info
+  function showBotInfo() {
+    console.log('\n' + '='.repeat(50));
+    console.log('🤖 BOT INFORMATION');
+    console.log('='.repeat(50));
+    console.log(`Model: ${GROQ_MODEL}`);
+    console.log(`Message History: ${botMessageHistory.size} pesan`);
+    console.log(`Available Models: ${GROQ_MODELS.join(', ')}`);
+    console.log('='.repeat(50));
+  }
+  
+  // Auto show info setiap 15 menit
+  setInterval(showBotInfo, 900000);
 }
 
 // ======================
-// 3. START BOT
+// 3. ERROR HANDLING
+// ======================
+process.on('uncaughtException', (error) => {
+  console.error('🔥 UNCAUGHT EXCEPTION:', error.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🔥 UNHANDLED REJECTION at:', promise, 'reason:', reason);
+});
+
+// ======================
+// 4. START BOT
 // ======================
 startBot().catch(console.error);
-
