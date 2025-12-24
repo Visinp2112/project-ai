@@ -9,6 +9,12 @@ import Groq from 'groq-sdk';
 
 dotenv.config();
 
+// ⭐⭐ TAMBAHKAN BARIS INI UNTUK DEBUG ⭐⭐
+console.log('🔍 Debug .env path:', process.cwd());
+console.log('🔍 File .env ada?', require('fs').existsSync('.env') ? 'YA' : 'TIDAK');
+console.log('🔍 GROQ_API_KEY ditemukan?', process.env.GROQ_API_KEY ? 'YA (' + process.env.GROQ_API_KEY.substring(0, 10) + '...)' : 'TIDAK');
+// ⭐⭐ SAMPAI SINI ⭐⭐
+
 // ======================
 // 1. SETUP GROQ AI (100% GRATIS)
 // ======================
@@ -331,4 +337,5 @@ process.on('unhandledRejection', (reason, promise) => {
 // ======================
 // 4. START BOT
 // ======================
+
 startBot().catch(console.error);
