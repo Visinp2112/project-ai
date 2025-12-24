@@ -151,26 +151,49 @@ async function startBot() {
   
   // EVENT: Connection Update
   sock.ev.on('connection.update', (update) => {
-    const { connection, qr, lastDisconnect } = update;
+  const { connection, qr, lastDisconnect } = update;
+  
+  if (qr) {
+    console.log('\n' + '='.repeat(60));
+    console.log('📱 WHATSAPP BOT - SCAN QR CODE');
+    console.log('='.repeat(60));
     
-    if (qr) {
-      console.log('📡 Scan QR Code:');
-      qrcode.generate(qr, { small: true });
-    }
+    // 1. Tampilkan QR di terminal
+    console.log('\n[OPTION 1 - Scan dari terminal]:');
+    qrcode.generate(qr, { small: true });
     
-    if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) {
-        console.log('🔄 Reconnecting...');
-        setTimeout(() => startBot(), 3000);
-      }
-    }
+    // 2. Tampilkan link untuk online QR
+    console.log('\n[OPTION 2 - Buka link QR gambar]:');
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+    console.log(qrUrl);
     
-    if (connection === 'open') {
-      console.log('✅ WhatsApp Connected!');
-      showUsageStats();
+    // 3. Alternatif link lainnya
+    console.log('\n[OPTION 3 - Alternatif link]:');
+    console.log(`https://quickchart.io/qr?text=${encodeURIComponent(qr)}&size=300`);
+    console.log(`https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(qr)}`);
+    
+    console.log('\n💡 CARA SCAN:');
+    console.log('• Screenshot QR di atas → zoom in → scan');
+    console.log('• ATAU buka link di browser → scan gambar');
+    console.log('• WhatsApp → Settings → Linked Devices');
+    console.log('='.repeat(60));
+  }
+  
+  if (connection === 'close') {
+    const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+    
+    console.log(`⚠️ Koneksi terputus. Reconnect? ${shouldReconnect}`);
+    
+    if (shouldReconnect) {
+      console.log('🔄 Menghubungkan ulang dalam 3 detik...');
+      setTimeout(() => startBot(), 3000);
     }
-  });
+  }
+  
+  if (connection === 'open') {
+    console.log('✅ WhatsApp terhubung! Bot siap menerima pesan.');
+  }
+});
   
   sock.ev.on('creds.update', saveCreds);
   
@@ -247,4 +270,5 @@ async function startBot() {
 // ======================
 // 3. START BOT
 // ======================
+
 startBot().catch(console.error);
