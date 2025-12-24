@@ -1,5 +1,5 @@
 {
-  "name": "visinp-ai-baileys",
+  "name": "Visinp AI",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -12,3 +12,4 @@
     "pino": "^8.17.2"
   }
 }
+
