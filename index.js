@@ -1,44 +1,38 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const venom = require('venom-bot');
 const axios = require('axios');
 
+// Buat client WA pakai Venom
+venom
+  .create({
+    session: 'ai-bot',      // nama session, bisa bebas
+    multidevice: true        // gunakan mode multi-device WA
+  })
+  .then(client => start(client))
+  .catch(err => console.error(err));
 
-// Buat client WA
-const client = new Client({ authStrategy: new LocalAuth() });
+function start(client) {
+  console.log('Bot WA siap jalan!');
 
-// QR code untuk login
-client.on('qr', qr => {
-    qrcode.generate(qr, { small: true });
-    console.log('Scan QR pakai WhatsApp di HP kamu!');
-});
+  // Auto-reply AI
+  client.onMessage(async message => {
+    if (message.body.startsWith('!ai ')) {
+      const prompt = message.body.slice(4); // hapus "!ai "
+      try {
+        const response = await axios.post(
+          'https://api.deepseek.com/v1/query',
+          { prompt },
+          {
+            headers: { 'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}` }
+          }
+        );
 
-// Siap
-client.on('ready', () => {
-    console.log('Bot WA siap jalan!');
-});
+        const answer = response.data.answer || 'AI tidak bisa menjawab';
+        await client.sendText(message.from, answer);
 
-// Auto-reply AI
-client.on('message', async msg => {
-    if (msg.body.startsWith('!ai ')) {
-        const prompt = msg.body.slice(4); // hapus "!ai "
-        try {
-            const response = await axios.post('https://api.deepseek.com/v1/query', {
-                prompt: prompt
-            }, {
-                headers: { 'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}` }
-            });
-
-            const answer = response.data.answer || 'AI tidak bisa menjawab';
-            msg.reply(answer);
-
-        } catch (error) {
-            console.log(error);
-            msg.reply('Terjadi error saat memanggil AI, Coba lagi nanti.');
-        }
+      } catch (error) {
+        console.log(error);
+        await client.sendText(message.from, 'Terjadi error saat memanggil AI, coba lagi nanti.');
+      }
     }
-});
-
-// Initialize bot
-client.initialize();
-
-
+  });
+}
