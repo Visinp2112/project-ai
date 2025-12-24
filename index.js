@@ -1,6 +1,14 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
+// index.js (di atas kode bot)
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => res.send('Bot WA aktif!'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
 // Buat client WA
 const client = new Client({ authStrategy: new LocalAuth() });
@@ -39,3 +47,4 @@ client.on('message', async msg => {
 
 // Initialize bot
 client.initialize();
+
