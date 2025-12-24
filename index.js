@@ -10,10 +10,10 @@ import OpenAI from 'openai';
 dotenv.config();
 
 // ======================
-// 1. SETUP OPENAI GPT-4o
+// 1. SETUP OPENAI GPT-3.5-TURBO
 // ======================
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';  // ⭐ GPT-4o! (Bukan gpt-4)
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';  // ⭐ GPT-3.5-TURBO!
 const MAX_TOKENS = parseInt(process.env.MAX_TOKENS) || 300;
 
 if (!OPENAI_API_KEY) {
@@ -23,7 +23,7 @@ if (!OPENAI_API_KEY) {
 }
 
 console.log(`🚀 MODEL YANG DIGUNAKAN: ${OPENAI_MODEL}`);
-console.log(`💰 INFO: GPT-4o lebih murah dari GPT-4!`);
+console.log(`💰 INFO: GPT-3.5-turbo = $0.002/1K tokens (MURAH!)`);
 console.log(`📊 Token limit: ${MAX_TOKENS} per response`);
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
@@ -36,7 +36,7 @@ let usageStats = {
   lastReset: Date.now()
 };
 
-async function callGPT4o(prompt) {  // ⭐ Ganti nama fungsi
+async function callGPT(prompt) {  // ⭐ Nama fungsi lebih general
   const startTime = Date.now();
   
   try {
@@ -61,10 +61,8 @@ async function callGPT4o(prompt) {  // ⭐ Ganti nama fungsi
     const response = completion.choices[0].message.content;
     const tokensUsed = completion.usage?.total_tokens || 100;
     
-    // Hitung estimated cost (GPT-4o lebih murah)
-    const costPerToken = OPENAI_MODEL.includes('gpt-4o') ? 0.000015 :  // GPT-4o
-                         OPENAI_MODEL.includes('gpt-4') ? 0.00006 :   // GPT-4
-                         0.000002;                                    // GPT-3.5
+    // Hitung estimated cost (GPT-3.5 lebih murah!)
+    const costPerToken = 0.000002;  // $0.002 per 1K tokens
     const requestCost = tokensUsed * costPerToken;
     
     usageStats.totalRequests++;
@@ -72,7 +70,7 @@ async function callGPT4o(prompt) {  // ⭐ Ganti nama fungsi
     
     const responseTime = Date.now() - startTime;
     
-    console.log(`✅ ${OPENAI_MODEL} merespon (${responseTime}ms)`);  // ⭐ Generic
+    console.log(`✅ ${OPENAI_MODEL} merespon (${responseTime}ms)`);
     console.log(`💰 Token: ${tokensUsed} | Estimasi cost: $${requestCost.toFixed(6)}`);
     console.log(`📊 Total: ${usageStats.totalRequests} requests | $${usageStats.estimatedCost.toFixed(4)}`);
     
@@ -81,19 +79,8 @@ async function callGPT4o(prompt) {  // ⭐ Ganti nama fungsi
   } catch (error) {
     console.error(`❌ Error dari ${OPENAI_MODEL}:`, error.message);
     
-    // Fallback ke GPT-3.5 jika error
-    if (error.status === 404 || error.status === 429) {
-      console.log('🔄 Coba fallback ke GPT-3.5-turbo...');
-      try {
-        const fallback = await openai.chat.completions.create({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: MAX_TOKENS,
-        });
-        return fallback.choices[0].message.content;
-      } catch (fallbackError) {
-        return 'Maaf, quota AI sedang habis. Coba lagi besok ya!';
-      }
+    if (error.status === 429) {
+      return 'Maaf, quota AI sedang habis. Coba lagi besok ya!';
     }
     
     return 'Maaf, terjadi kesalahan. Silakan coba lagi!';
@@ -104,8 +91,8 @@ async function callGPT4o(prompt) {  // ⭐ Ganti nama fungsi
 // 2. WHATSAPP BOT DENGAN MONITORING
 // ======================
 async function startBot() {
-  console.log('🚀 WhatsApp Bot dengan GPT-4o Active!');  // ⭐ UPDATE
-  console.log('💰 INFO: GPT-4o = $0.015/1K tokens (lebih murah!)');  // ⭐ UPDATE
+  console.log('🚀 WhatsApp Bot dengan GPT-3.5-turbo Active!');  // ⭐ UPDATE
+  console.log('💰 INFO: GPT-3.5-turbo = $0.002/1K tokens (MURAH!)');  // ⭐ UPDATE
   console.log('📌 Mode: Wajib tag/reply di grup');
   
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
@@ -115,7 +102,7 @@ async function startBot() {
     version,
     auth: state,
     printQRInTerminal: false,
-    browser: ['GPT-4o WhatsApp Bot', 'Chrome', '1.0.0']  // ⭐ UPDATE
+    browser: ['GPT-3.5 WhatsApp Bot', 'Chrome', '1.0.0']  // ⭐ UPDATE
   });
   
   // FUNGSI: Cek apakah perlu response
@@ -158,11 +145,6 @@ async function startBot() {
     if (qr) {
       console.log('📡 Scan QR Code:');
       qrcode.generate(qr, { small: true });
-      
-      // ⭐ TAMBAHKAN LINK QR
-      console.log('\n🔗 ATAU BUKA LINK INI untuk QR Code gambar:');
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-      console.log(qrUrl);
     }
     
     if (connection === 'close') {
@@ -206,7 +188,7 @@ async function startBot() {
     await sock.sendPresenceUpdate('composing', sender);
     
     try {
-      const aiResponse = await callGPT4o(cleanText);  // ⭐ Ganti panggilan fungsi
+      const aiResponse = await callGPT(cleanText);  // ⭐ Ganti panggilan fungsi
       const finalResponse = isGroup ? `🤖 ${aiResponse}` : aiResponse;
       
       await sock.sendPresenceUpdate('paused', sender);
