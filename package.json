@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-gpt4-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot dengan GPT-4",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "monitor": "node monitor-cost.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.19",
+    "dotenv": "^16.0.0",
+    "openai": "^4.20.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
